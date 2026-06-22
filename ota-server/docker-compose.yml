@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ota_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ota_db_password
+      POSTGRES_DB: ota_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # Mount file init.sql để PostgreSQL tự động chạy khi khởi tạo database lần đầu
+      - ./be-api/app/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Mount volume để data lưu lại không bị mất khi stop/remove container
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ota_network
+
+  adminer:
+    image: adminer:latest
+    container_name: ota_adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - ota_network
+
+  kms:
+    build:
+      context: ./kms
+      dockerfile: Dockerfile
+    container_name: ota_kms
+    restart: always
+    volumes:
+      # Keys are mounted at runtime — NEVER baked into the image
+      - ./kms/keys:/app/keys:ro
+    # TODO(security): KMS must NOT expose port 8001 publicly in production.
+    # Remove the 'ports' mapping and rely solely on the internal Docker network.
+    # The port is exposed here for local development convenience only.
+    ports:
+      - "127.0.0.1:8001:8001"
+    networks:
+      - ota_network
+
+  be-api:
+    build:
+      context: ./be-api
+      dockerfile: Dockerfile
+    container_name: ota_backend_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:ota_db_password@db:5432/ota_db
+      - KMS_URL=http://kms:8001
+      - STORAGE_BASE_PATH=/storage
+    volumes:
+      # Firmware storage — persistent across restarts
+      - firmware_storage:/storage
+    depends_on:
+      - db
+      - kms
+    networks:
+      - ota_network
+
+volumes:
+  postgres_data:
+  firmware_storage:
+
+networks:
+  ota_network:
+    driver: bridge
