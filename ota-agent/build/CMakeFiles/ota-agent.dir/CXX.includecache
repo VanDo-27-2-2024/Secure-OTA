@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/app/src/main.cpp
+chrono
+-
+csignal
+-
+cstdlib
+-
+cstring
+-
+iostream
+-
+string
+-
+thread
+-
+curl/curl.h
+-
+
